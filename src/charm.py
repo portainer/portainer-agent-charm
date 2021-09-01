@@ -16,10 +16,10 @@ logger = logging.getLogger(__name__)
 # Reduce the log output from the Kubernetes library
 # logging.getLogger("kubernetes").setLevel(logging.INFO)
 CHARM_VERSION = 1.0
-PORTAINER_AGENT_IMG = "portainer/agent:2.7.0"
+# PORTAINER_AGENT_IMG = "portainer/agent:2.7.0"
 SERVICE_VERSION = "agent:2.7.0"
-SERVICETYPE_LB = "LoadBalancer"
-SERVICETYPE_CIP = "ClusterIP"
+# SERVICETYPE_LB = "LoadBalancer"
+# SERVICETYPE_CIP = "ClusterIP"
 SERVICETYPE_NP = "NodePort"
 CONFIG_SERVICETYPE = "service_type"
 CONFIG_SERVICEHTTPPORT = "service_http_port"
