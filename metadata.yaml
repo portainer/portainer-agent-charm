@@ -28,4 +28,5 @@ containers:
 resources:
   portainer-agent-image:
     type: oci-image
-    description: OCI image for portainer (portainer/agent:latest)
+    # description: OCI image for portainer (portainer/agent:alpine)
+    description: OCI image for portainer (portainer/agent:latest) 

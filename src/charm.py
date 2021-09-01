@@ -33,15 +33,17 @@ class PortainerAgentCharm(CharmBase):
         self.unit.status = MaintenanceStatus("patching kubernetes service for portainer agent")
         api = kubernetes.client.CoreV1Api(kubernetes.client.ApiClient())
         api.delete_namespaced_service(name="portainer-agent", namespace=self.namespace)
-        api.create_namespaced_service(**self._service)
         api.create_namespaced_service(**self._service_headless)
-
-    def _start_portainer_agent(self, event):
-        """Function to handle starting Portainer Agent using Pebble"""
         if not self._check_portaineragent_headless():
-            logging.info("Installation deferred: waiting for agent headless service...")
+            logging.info("Waiting for agent headless service...")
             event.defer()
             return
+        else:
+            logging.info("Agent headless service exists")
+        api.create_namespaced_service(**self._service)
+
+    def _start_portainer_agent(self, _):
+        """Function to handle starting Portainer Agent using Pebble"""
         # Get a reference to the portainer agent workload container
         container = self.unit.get_container("portainer-agent")
         with container.is_ready():
@@ -50,9 +52,11 @@ class PortainerAgentCharm(CharmBase):
             if not svc:
                 # Add a new layer and start the container
                 container.add_layer("portainer-agent", self._layer, combine=True)
+                logging.info("Pebble layer added")
+                if container.get_service("portainer-agent").is_running():
+                    container.stop("portainer-agent")
                 container.start("portainer-agent")
-
-            self.unit.status = ActiveStatus()
+                self.unit.status = ActiveStatus()
 
     def _check_portaineragent_headless(self):
         """Check if the Portainer agent headless service exists"""
@@ -104,7 +108,9 @@ class PortainerAgentCharm(CharmBase):
                 logging.info("Portainer Agent Pod: %s", pod.metadata.name)
                 logging.info("Portainer Agent Pod IP: %s", pod.status.pod_ip)
                 pod_ip=pod.status.pod_ip
-        return {
+        pebble_layer = {
+            "summary": "portainer-agent layer",
+            "description": "Pebble config layer for portainer-agent",
             "services": {
                 "portainer-agent": {
                     "override": "replace",
@@ -114,10 +120,12 @@ class PortainerAgentCharm(CharmBase):
                         "LOG_LEVEL": "DEBUG",
                         "AGENT_CLUSTER_ADDR": "portainer-agent-headless",
                         "KUBERNETES_POD_IP": pod_ip
-                        }
-                    }
+                    },
                 }
-            }
+            },
+        }
+        logging.info(pebble_layer)
+        return pebble_layer
 
     @property
     def _service(self) -> dict:
