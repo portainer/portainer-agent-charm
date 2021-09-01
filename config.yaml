@@ -1,0 +1,16 @@
+options:
+  service_type:
+    type: string
+    default: 'NodePort'
+    description: |
+      Service Type for the Portainer Agent Service; Accepts ClusterIP, NodePort and LoadBalancer.
+  service_http_port:
+    type: int
+    default: 9001
+    description: |
+      HTTP Portainer Agent port.
+  service_http_node_port:
+    type: int
+    default: 30778
+    description: |
+      Static NodePort for accessing the Portainer Agent. Specify only if the type is NodePort.
