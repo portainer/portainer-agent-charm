@@ -145,6 +145,7 @@ class PortainerAgentCharm(CharmBase):
                             name="http",
                             port=9001,
                             target_port=9001,
+                            protocol="TCP",
                             node_port=30778,
                         ),
                     ],
