@@ -108,6 +108,12 @@ class PortainerAgentCharm(CharmBase):
                 logging.info("Portainer Agent Pod: %s", pod.metadata.name)
                 logging.info("Portainer Agent Pod IP: %s", pod.status.pod_ip)
                 pod_ip=pod.status.pod_ip
+        service_list = api.list_namespaced_service("portainer")
+        for service in service_list.items:
+            if "portainer-agent" in service.metadata.name and ("headless" not in service.metadata.name or "endpoints" not in service.metadata.name):
+                logging.info("Portainer Agent Service: %s", service.metadata.name)
+                logging.info("Portainer Agent Service Cluster IP: %s", service.spec.cluster_ip)
+                agent_cluster_ip=service.spec.cluster_ip
         pebble_layer = {
             "summary": "portainer-agent layer",
             "description": "Pebble config layer for portainer-agent",
@@ -118,7 +124,7 @@ class PortainerAgentCharm(CharmBase):
                     "startup": "enabled",
                     "environment": {
                         "LOG_LEVEL": "DEBUG",
-                        "AGENT_CLUSTER_ADDR": "portainer-agent-headless",
+                        "AGENT_CLUSTER_ADDR": agent_cluster_ip,
                         "KUBERNETES_POD_IP": pod_ip
                     },
                 }
