@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 # logging.getLogger("kubernetes").setLevel(logging.INFO)
 CHARM_VERSION = 1.0
 # PORTAINER_AGENT_IMG = "portainer/agent:2.7.0"
-SERVICE_VERSION = "agent:2.7.0"
+SERVICE_VERSION = "portainer-agent-2.7.0"
 SERVICETYPE_LB = "LoadBalancer"
 SERVICETYPE_CIP = "ClusterIP"
 SERVICETYPE_NP = "NodePort"
@@ -132,11 +132,11 @@ class PortainerAgentCharm(CharmBase):
         if (service_type == SERVICETYPE_NP 
             and CONFIG_SERVICEHTTPNODEPORT in config):
             http_port.node_port = config[CONFIG_SERVICEHTTPNODEPORT]
-       
+
         result = kubernetes.client.V1ServiceSpec(
             type=service_type,
             ports=[
-                http_port,
+                http_port
             ],
             selector={
                 "app.kubernetes.io/name": self.app.name,
@@ -231,6 +231,12 @@ class PortainerAgentCharm(CharmBase):
                 logging.info("Portainer Agent Pod: %s", pod.metadata.name)
                 logging.info("Portainer Agent Pod IP: %s", pod.status.pod_ip)
                 pod_ip=pod.status.pod_ip
+        service_list = api.list_namespaced_service("portainer")
+        for service in service_list.items:
+            if "portainer-agent" in service.metadata.name and ("headless" not in service.metadata.name or "endpoints" not in service.metadata.name):
+                logging.info("Portainer Agent Service: %s", service.metadata.name)
+                logging.info("Portainer Agent Service Cluster IP: %s", service.spec.cluster_ip)
+                agent_cluster_ip=service.spec.cluster_ip
         return {
             "services": {
                 "portainer-agent": {
@@ -239,7 +245,7 @@ class PortainerAgentCharm(CharmBase):
                     "startup": "enabled",
                     "environment": {
                         "LOG_LEVEL": "DEBUG",
-                        "AGENT_CLUSTER_ADDR": "portainer-agent-headless",
+                        "AGENT_CLUSTER_ADDR": agent_cluster_ip,
                         "KUBERNETES_POD_IP": pod_ip
                     },
                 }
@@ -299,8 +305,8 @@ class PortainerAgentCharm(CharmBase):
       - service.httpPort to 30778
       """
       return {
-          CONFIG_SERVICETYPE: SERVICETYPE_NP,
-          CONFIG_SERVICEHTTPNODEPORT: 30778,
+          CONFIG_SERVICETYPE: SERVICETYPE_LB,
+          CONFIG_SERVICEHTTPPORT: 9001,
       }
 
     def _k8s_auth(self) -> bool:

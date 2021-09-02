@@ -1,7 +1,7 @@
 options:
   service_type:
     type: string
-    default: 'NodePort'
+    default: 'LoadBalancer'
     description: |
       Service Type for the Portainer Agent Service; Accepts ClusterIP, NodePort and LoadBalancer.
   service_http_port:
