@@ -24,6 +24,9 @@ SERVICETYPE_NP = "NodePort"
 CONFIG_SERVICETYPE = "service_type"
 CONFIG_SERVICEHTTPPORT = "service_http_port"
 CONFIG_SERVICEHTTPNODEPORT = "service_http_node_port"
+EDGE = "edge"
+EDGE_ID = "edge_id"
+EDGE_KEY = "edge_key"
 
 class PortainerAgentCharm(CharmBase):
     """Charm the service."""
@@ -47,12 +50,17 @@ class PortainerAgentCharm(CharmBase):
     def _on_install(self, event):
         """Handle the install event, create Kubernetes resources"""
         logger.info("installing charm")
+        # config = { **self._config, **self.model.config }
+        config = self._default_config
         if not self._k8s_auth():
             self.unit.status = WaitingStatus('waiting for k8s auth')
             logger.info("waiting for k8s auth, installation deferred")
             event.defer()
             return
-        self.unit.status = MaintenanceStatus("creating kubernetes service for portainer agent")
+        if (config[EDGE] == 1):
+            self.unit.status = MaintenanceStatus("creating kubernetes service for portainer edge agent")
+        else:
+            self.unit.status = MaintenanceStatus("creating kubernetes service for portainer agent")
         self._create_k8s_headless_service_by_config()
         self._create_k8s_service_by_config()
 
@@ -233,7 +241,7 @@ class PortainerAgentCharm(CharmBase):
                 pod_ip=pod.status.pod_ip
         service_list = api.list_namespaced_service("portainer")
         for service in service_list.items:
-            if "portainer-agent" in service.metadata.name and ("headless" not in service.metadata.name or "endpoints" not in service.metadata.name):
+            if service.metadata.name == "portainer-agent":
                 logging.info("Portainer Agent Service: %s", service.metadata.name)
                 logging.info("Portainer Agent Service Cluster IP: %s", service.spec.cluster_ip)
                 agent_cluster_ip=service.spec.cluster_ip
@@ -301,12 +309,16 @@ class PortainerAgentCharm(CharmBase):
     def _default_config(self) -> dict:
       """Returns the default config of this charm, which sets:
 
-      - service.type to NodePort
-      - service.httpPort to 30778
+      - service.type to LoadBalancer
+      - service.httpPort to 9001
+      - service.httpNodePort to 30778
+      - edge_enabled to False
       """
       return {
           CONFIG_SERVICETYPE: SERVICETYPE_LB,
           CONFIG_SERVICEHTTPPORT: 9001,
+          CONFIG_SERVICEHTTPNODEPORT: 30778,
+          EDGE: 0,
       }
 
     def _k8s_auth(self) -> bool:
