@@ -27,6 +27,9 @@ CONFIG_SERVICEHTTPNODEPORT = "service_http_node_port"
 EDGE = "edge"
 EDGE_ID = "edge_id"
 EDGE_KEY = "edge_key"
+AGENTTYPE_AGENT = "agent"
+AGENTTYPE_EDGE = "edge-agent"
+AGENTTYPE = AGENTTYPE_EDGE
 
 class PortainerAgentCharm(CharmBase):
     """Charm the service."""
@@ -50,8 +53,8 @@ class PortainerAgentCharm(CharmBase):
     def _on_install(self, event):
         """Handle the install event, create Kubernetes resources"""
         logger.info("installing charm")
-        # config = { **self._config, **self.model.config }
-        config = self._default_config
+        config = { **self._config, **self.model.config }
+        # config = self._default_config
         if not self._k8s_auth():
             self.unit.status = WaitingStatus('waiting for k8s auth')
             logger.info("waiting for k8s auth, installation deferred")
@@ -59,20 +62,23 @@ class PortainerAgentCharm(CharmBase):
             return
         if (config[EDGE] == 1):
             self.unit.status = MaintenanceStatus("creating kubernetes service for portainer edge agent")
+            logger.info("creating kubernetes service for portainer edge agent")
         else:
             self.unit.status = MaintenanceStatus("creating kubernetes service for portainer agent")
-        self._create_k8s_headless_service_by_config()
-        self._create_k8s_service_by_config()
+            logger.info("creating kubernetes service for portainer agent")
+        self._create_k8s_headless_service_by_config(self._config)
+        self._create_k8s_service_by_config(self._config)
 
-    def _create_k8s_headless_service_by_config(self):
+    def _create_k8s_headless_service_by_config(self, config: dict):
         """Delete then create k8s headless service by stored config."""
+        agent_headless_name = "portainer-" + config[AGENTTYPE] + "-headless"
         logger.info("creating k8s headless service")
         api = kubernetes.client.CoreV1Api(kubernetes.client.ApiClient())
         try:
-            api.delete_namespaced_service(name="portainer-agent-headless", namespace=self.namespace)
+            api.delete_namespaced_service(name=agent_headless_name, namespace=self.namespace)
         except kubernetes.client.exceptions.ApiException as e:
             if e.status == 404:
-                logger.info("portainer agent headless service doesn't exist, skip deletion")
+                logger.info("%s service doesn't exist, skip deletion", agent_headless_name)
             else:
                 raise e
         api.create_namespaced_service(
@@ -80,15 +86,16 @@ class PortainerAgentCharm(CharmBase):
             body=self._build_k8s_headless_service_by_config(self._config),
         )
 
-    def _create_k8s_service_by_config(self):
+    def _create_k8s_service_by_config(self, config: dict):
         """Delete then create k8s service by stored config."""
+        agent_name = "portainer-agent"
         logger.info("creating k8s service")
         api = kubernetes.client.CoreV1Api(kubernetes.client.ApiClient())
         try:
-            api.delete_namespaced_service(name="portainer-agent", namespace=self.namespace)
+            api.delete_namespaced_service(name=agent_name, namespace=self.namespace)
         except kubernetes.client.exceptions.ApiException as e:
             if e.status == 404:
-                logger.info("portainer agent service doesn't exist, skip deletion")
+                logger.info("%s service doesn't exist, skip deletion", agent_name)
             else:
                 raise e
         api.create_namespaced_service(
@@ -98,11 +105,12 @@ class PortainerAgentCharm(CharmBase):
 
     def _build_k8s_headless_service_by_config(self, config: dict) -> kubernetes.client.V1Service:
         """Constructs k8s agent headless service spec by input config"""
+        agent_headless_name = "portainer-" + config[AGENTTYPE] + "-headless"
         return kubernetes.client.V1Service(
             api_version="v1",
             metadata=kubernetes.client.V1ObjectMeta(
                 namespace=self.namespace,
-                name="portainer-agent-headless",
+                name=agent_headless_name,
             ),
             spec=kubernetes.client.V1ServiceSpec(
                     cluster_ip="None",
@@ -114,11 +122,12 @@ class PortainerAgentCharm(CharmBase):
 
     def _build_k8s_service_by_config(self, config: dict) -> kubernetes.client.V1Service:
         """Constructs k8s agent service spec by input config"""
+        agent_name = "portainer-agent"
         return kubernetes.client.V1Service(
             api_version="v1",
             metadata=kubernetes.client.V1ObjectMeta(
                 namespace=self.namespace,
-                name=self.app.name,
+                name=agent_name,
                 labels={
                     "io.portainer.kubernetes.application.stack": self.app.name,
                     "app.kubernetes.io/name": self.app.name,
@@ -185,7 +194,7 @@ class PortainerAgentCharm(CharmBase):
         logger.info("updating k8s service by config")
         client = kubernetes.client.ApiClient()
         api = kubernetes.client.CoreV1Api(client)
-        
+        agent_name = "portainer-agent"
         # a direct replacement of /spec won't work, since it misses things like cluster_ip;
         # need to serialize the object to dictionay then clean none entries to replace bits by bits.
         spec = utils.clean_nones(
@@ -201,7 +210,7 @@ class PortainerAgentCharm(CharmBase):
         logger.debug(f"patching with body: {body}")
         if body:
             api.patch_namespaced_service(
-                name="portainer-agent",
+                name=agent_name,
                 namespace=self.namespace,
                 body=body,
             )
@@ -213,17 +222,18 @@ class PortainerAgentCharm(CharmBase):
         """Update pebble by config"""
         logger.info("updating pebble")
         # get a reference to the portainer workload container
-        container = self.unit.get_container("portainer-agent")
+        agent_name = "portainer-agent"
+        container = self.unit.get_container(agent_name)
         if container.is_ready():
-            svc = container.get_services().get("portainer-agent", None)
+            svc = container.get_services().get(agent_name, None)
             # check if the pebble service is already running
             if svc:
                 logger.info("stopping pebble service")
-                container.stop("portainer-agent")
+                container.stop(agent_name)
             # override existing layer
-            container.add_layer("portainer-agent", self._build_layer_by_config(config), combine=True)
+            container.add_layer(agent_name, self._build_layer_by_config(config), combine=True)
             logger.info("starting pebble service")
-            container.start("portainer-agent")
+            container.start(agent_name)
         else:
             self.unit.status = WaitingStatus('waiting for container to start')
             logger.info("waiting for container to start, update pebble deferred")
@@ -233,44 +243,69 @@ class PortainerAgentCharm(CharmBase):
         """Returns a pebble layer by config"""
         self._k8s_auth()
         api = kubernetes.client.CoreV1Api(kubernetes.client.ApiClient())
+        agent_name = "portainer-agent"
         pod_list = api.list_namespaced_pod("portainer")
         for pod in pod_list.items:
-            if "portainer-agent" in pod.metadata.name:
+            if agent_name in pod.metadata.name:
                 logging.info("Portainer Agent Pod: %s", pod.metadata.name)
                 logging.info("Portainer Agent Pod IP: %s", pod.status.pod_ip)
                 pod_ip=pod.status.pod_ip
         service_list = api.list_namespaced_service("portainer")
         for service in service_list.items:
-            if service.metadata.name == "portainer-agent":
+            if service.metadata.name == agent_name:
                 logging.info("Portainer Agent Service: %s", service.metadata.name)
                 logging.info("Portainer Agent Service Cluster IP: %s", service.spec.cluster_ip)
                 agent_cluster_ip=service.spec.cluster_ip
-        return {
-            "services": {
-                "portainer-agent": {
-                    "override": "replace",
-                    "command": "./agent",
-                    "startup": "enabled",
-                    "environment": {
-                        "LOG_LEVEL": "DEBUG",
-                        "AGENT_CLUSTER_ADDR": agent_cluster_ip,
-                        "KUBERNETES_POD_IP": pod_ip
-                    },
-                }
-            },
-        }
+        if config[EDGE] == 1:
+            command = "./agent"
+            return {
+                "services": {
+                    agent_name: {
+                        "override": "replace",
+                        "command": command,
+                        "startup": "enabled",
+                        "environment": {
+                            "LOG_LEVEL": "DEBUG",
+                            "AGENT_PORT": "9001",
+                            "AGENT_CLUSTER_ADDR": agent_cluster_ip,
+                            "KUBERNETES_POD_IP": pod_ip,
+                            "EDGE": "1",
+                            "EDGE_ID": config[EDGE_ID],
+                            "EDGE_KEY": config[EDGE_KEY],
+                        },
+                    }
+                },
+            }
+        else:
+            command = "./agent"
+            return {
+                "services": {
+                    agent_name: {
+                        "override": "replace",
+                        "command": command,
+                        "startup": "enabled",
+                        "environment": {
+                            "LOG_LEVEL": "DEBUG",
+                            "AGENT_PORT": "9001",
+                            "AGENT_CLUSTER_ADDR": agent_cluster_ip,
+                            "KUBERNETES_POD_IP": pod_ip
+                        },
+                    }
+                },
+            }
 
     def _start_portainer_agent(self, _):
         """Function to handle starting Portainer using Pebble"""
         # Get a reference to the portainer workload container
-        container = self.unit.get_container("portainer-agent")
+        agent_name = "portainer-agent"
+        container = self.unit.get_container(agent_name)
         with container.is_ready():
-            svc = container.get_services().get("portainer-agent", None)
+            svc = container.get_services().get(agent_name, None)
             # Check if the service is already running
             if not svc:
                 # Add a new layer
-                container.add_layer("portainer-agent", self._build_layer_by_config(self._config), combine=True)
-                container.start("portainer-agent")
+                container.add_layer(agent_name, self._build_layer_by_config(self._config), combine=True)
+                container.start(agent_name)
 
             self.unit.status = ActiveStatus()
 
@@ -318,7 +353,10 @@ class PortainerAgentCharm(CharmBase):
           CONFIG_SERVICETYPE: SERVICETYPE_LB,
           CONFIG_SERVICEHTTPPORT: 9001,
           CONFIG_SERVICEHTTPNODEPORT: 30778,
-          EDGE: 0,
+          EDGE: 1,
+          EDGE_ID: "43f62d5c-96cb-46de-ad80-77aaa946d336",
+          EDGE_KEY: "aHR0cDovLzMuMjUuMTQzLjM0OjkwMDB8My4yNS4xNDMuMzQ6ODAwMHw2ZDpmOTo4NDpiZDo5NToxMjphZDplNDoyMjpjZjo5YTpiNzo4NTo5ZToyZDpmZXwxMA",
+          AGENTTYPE: AGENTTYPE_EDGE
       }
 
     def _k8s_auth(self) -> bool:

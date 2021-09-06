@@ -16,7 +16,7 @@ options:
       Static NodePort for accessing the Portainer Agent. Specify only if the type is NodePort.
   edge:
     type: int
-    default: 0
+    default: 1
     description: |
       Enable/disable Edge mode on Agent.
   edge_id:
