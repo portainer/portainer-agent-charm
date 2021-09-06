@@ -29,7 +29,7 @@ EDGE_ID = "edge_id"
 EDGE_KEY = "edge_key"
 AGENTTYPE_AGENT = "agent"
 AGENTTYPE_EDGE = "edge-agent"
-AGENTTYPE = AGENTTYPE_EDGE
+AGENTTYPE = AGENTTYPE_AGENT
 
 class PortainerAgentCharm(CharmBase):
     """Charm the service."""
@@ -53,8 +53,7 @@ class PortainerAgentCharm(CharmBase):
     def _on_install(self, event):
         """Handle the install event, create Kubernetes resources"""
         logger.info("installing charm")
-        config = { **self._config, **self.model.config }
-        # config = self._default_config
+        config = self._config
         if not self._k8s_auth():
             self.unit.status = WaitingStatus('waiting for k8s auth')
             logger.info("waiting for k8s auth, installation deferred")
@@ -71,7 +70,7 @@ class PortainerAgentCharm(CharmBase):
 
     def _create_k8s_headless_service_by_config(self, config: dict):
         """Delete then create k8s headless service by stored config."""
-        agent_headless_name = "portainer-" + config[AGENTTYPE] + "-headless"
+        agent_headless_name = "portainer-agent-headless"
         logger.info("creating k8s headless service")
         api = kubernetes.client.CoreV1Api(kubernetes.client.ApiClient())
         try:
@@ -105,7 +104,7 @@ class PortainerAgentCharm(CharmBase):
 
     def _build_k8s_headless_service_by_config(self, config: dict) -> kubernetes.client.V1Service:
         """Constructs k8s agent headless service spec by input config"""
-        agent_headless_name = "portainer-" + config[AGENTTYPE] + "-headless"
+        agent_headless_name = "portainer-agent-headless"
         return kubernetes.client.V1Service(
             api_version="v1",
             metadata=kubernetes.client.V1ObjectMeta(
@@ -176,10 +175,12 @@ class PortainerAgentCharm(CharmBase):
                 event.defer()
                 return
             self._patch_k8s_service_by_config(new_config)
-        # update pebble if service type is changed to or from nodeport
-        if (new_config[CONFIG_SERVICETYPE] != self._config[CONFIG_SERVICETYPE]
+        # update pebble if service type is changed to or from nodeport or agent type is changed to or from edge
+        if ((new_config[CONFIG_SERVICETYPE] != self._config[CONFIG_SERVICETYPE]
             and (new_config[CONFIG_SERVICETYPE] == SERVICETYPE_NP 
-                or self._config[CONFIG_SERVICETYPE] == SERVICETYPE_NP)):
+                or self._config[CONFIG_SERVICETYPE] == SERVICETYPE_NP)) or (new_config[AGENTTYPE] != self._config[AGENTTYPE]
+            and (new_config[AGENTTYPE] == AGENTTYPE_EDGE 
+                or self._config[AGENTTYPE] == AGENTTYPE_EDGE))):
             self._update_pebble(event, new_config)
         # set the config
         self._config = new_config
@@ -309,27 +310,6 @@ class PortainerAgentCharm(CharmBase):
 
             self.unit.status = ActiveStatus()
 
-    # def _check_portaineragent_headless(self):
-    #     """Check if the Portainer agent headless service exists"""
-    #     self._k8s_auth()
-    #     api = kubernetes.client.CoreV1Api(kubernetes.client.ApiClient())
-    #     existing = None
-    #     try:
-    #         existing = api.read_namespaced_service(
-    #             name="portainer-agent-headless",
-    #             namespace=self.namespace,
-    #         )
-    #     except kubernetes.client.exceptions.ApiException as e:
-    #         if e.status == 404:
-    #             logger.info("Portainer agent headless service doesn't exist")
-    #             return False
-    #         else:
-    #             raise e
-    #     if not existing:
-    #         logger.info("Portainer agent headless service doesn't exist")
-    #         return False
-    #     return True
-
     @property
     def _config(self) -> dict:
         """Returns the stored config"""
@@ -348,15 +328,18 @@ class PortainerAgentCharm(CharmBase):
       - service.httpPort to 9001
       - service.httpNodePort to 30778
       - edge_enabled to False
+      - edge_id to empty string
+      - edge_key to empty string
+      - agenttype to agent
       """
       return {
           CONFIG_SERVICETYPE: SERVICETYPE_LB,
           CONFIG_SERVICEHTTPPORT: 9001,
           CONFIG_SERVICEHTTPNODEPORT: 30778,
-          EDGE: 1,
-          EDGE_ID: "43f62d5c-96cb-46de-ad80-77aaa946d336",
-          EDGE_KEY: "aHR0cDovLzMuMjUuMTQzLjM0OjkwMDB8My4yNS4xNDMuMzQ6ODAwMHw2ZDpmOTo4NDpiZDo5NToxMjphZDplNDoyMjpjZjo5YTpiNzo4NTo5ZToyZDpmZXwxMA",
-          AGENTTYPE: AGENTTYPE_EDGE
+          EDGE: 0,
+          EDGE_ID: "",
+          EDGE_KEY: "",
+          AGENTTYPE: AGENTTYPE_AGENT,
       }
 
     def _k8s_auth(self) -> bool:
