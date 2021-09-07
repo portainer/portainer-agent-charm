@@ -27,6 +27,7 @@ CONFIG_SERVICEHTTPNODEPORT = "service_http_node_port"
 EDGE = "edge"
 EDGE_ID = "edge_id"
 EDGE_KEY = "edge_key"
+# EDGE_INSECURE_POLL = "edge_insecure_poll"
 AGENTTYPE_AGENT = "agent"
 AGENTTYPE_EDGE = "edge-agent"
 AGENTTYPE = AGENTTYPE_AGENT
