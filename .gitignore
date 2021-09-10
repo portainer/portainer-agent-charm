@@ -8,3 +8,5 @@ __pycache__/
 
 cleanup.sh
 standup.sh
+
+.vscode
