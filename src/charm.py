@@ -209,7 +209,7 @@ class PortainerAgentCharm(CharmBase):
         # get a reference to the portainer workload container
         agent_name = self.app.name
         container = self.unit.get_container(agent_name)
-        if container.is_ready():
+        if container.can_connect():
             svc = container.get_services().get(agent_name, None)
             # check if the pebble service is already running
             if svc:
@@ -280,7 +280,7 @@ class PortainerAgentCharm(CharmBase):
         # Get a reference to the portainer workload container
         agent_name = "portainer-agent"
         container = self.unit.get_container(agent_name)
-        with container.is_ready():
+        if container.can_connect():
             svc = container.get_services().get(agent_name, None)
             # Check if the service is already running
             if not svc:
