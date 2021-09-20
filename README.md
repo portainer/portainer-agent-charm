@@ -1,12 +1,52 @@
-# portainer
+# Portainer agent
 
 ## Description
 
-TODO: Describe your charm in a few paragraphs of Markdown
+Portainer is a lightweight ‘universal’ management GUI that can be used to easily manage Docker, Swarm, Kubernetes and ACI environments. It is designed to be as simple to deploy as it is to use.
+
+Portainer consists of a single container that can run on any cluster. It can be deployed as a Linux container or a Windows native container.
+
+Portainer allows you to manage all your orchestrator resources (containers, images, volumes, networks and more) through a super-simple graphical interface.
+
+This fully supported version of Portainer is available for business use. Visit http://www.portainer.io to learn more.
+
+This Juju charm will help you deploy the Portainer agent allowing you to manage multiple container environments from a single Portainer instance.
 
 ## Usage
 
-TODO: Provide high-level usage, such as required config or relations
+Create a Juju model for Portainer:
+
+```
+juju add-model portainer
+```
+
+Deploy the Portainer agent:
+
+```
+juju deploy portainer-agent --trust
+```
+
+Give the Portainer agent cluster access:
+
+```
+juju trust portainer-agent --scope=cluster
+```
+
+This will deploy the Portainer agent and expose it over an external load balancer on port 9001.
+
+## Configuration
+
+You can deploy Portainer and expose it over ClusterIP if you prefer:
+
+```
+juju config portainer-agent service_type=ClusterIP service_http_port=9001
+```
+
+You can also use Node port:
+
+```
+juju config portainer-agent service_type=NodePort service_http_port=9001 service_http_node_port=30778
+```
 
 
 ## Developing
