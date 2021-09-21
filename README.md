@@ -8,8 +8,6 @@ Portainer consists of a single container that can run on any cluster. It can be 
 
 Portainer allows you to manage all your orchestrator resources (containers, images, volumes, networks and more) through a super-simple graphical interface.
 
-This fully supported version of Portainer is available for business use. Visit http://www.portainer.io to learn more.
-
 This Juju charm will help you deploy the Portainer agent allowing you to manage multiple container environments from a single Portainer instance.
 
 ## Usage
