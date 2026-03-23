@@ -1,3 +1,6 @@
+> [!IMPORTANT]
+> portainer-agent-charm is not supported and this repository is now archived
+
 # Portainer agent
 
 ## Description
